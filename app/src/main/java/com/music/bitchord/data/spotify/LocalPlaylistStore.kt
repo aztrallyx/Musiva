@@ -77,6 +77,10 @@ object LocalPlaylistStore {
                         albumId = sObj.optString("albumId", null).takeIf { !it.isNullOrBlank() && it != "null" },
                         albumName = sObj.optString("albumName", null).takeIf { !it.isNullOrBlank() && it != "null" },
                         isVideo = sObj.optBoolean("isVideo", false),
+                        localUri = sObj.optString("localUri", null).takeIf { !it.isNullOrBlank() && it != "null" },
+                        localPath = sObj.optString("localPath", null).takeIf { !it.isNullOrBlank() && it != "null" },
+                        localDateAddedSeconds = if (sObj.has("localDateAdded")) sObj.optLong("localDateAdded") else null,
+                        trackNumber = if (sObj.has("trackNumber")) sObj.optInt("trackNumber") else null,
                     )
                     songs.add(song)
                 }
@@ -134,6 +138,11 @@ object LocalPlaylistStore {
         mutate(id) {
             if (index !in it.songs.indices) it else it.copy(songs = it.songs.filterIndexed { i, _ -> i != index })
         }
+    }
+
+    /** Removes [videoId] from the playlist; a no-op when it is not there. */
+    fun removeSong(id: String, videoId: String) {
+        mutate(id) { it.copy(songs = it.songs.filterNot { s -> s.videoId == videoId }) }
     }
 
     fun moveSong(id: String, from: Int, to: Int) {
@@ -240,6 +249,12 @@ object LocalPlaylistStore {
                     sObj.put("albumId", song.albumId)
                     sObj.put("albumName", song.albumName)
                     sObj.put("isVideo", song.isVideo)
+                    // A song from this device is only playable through its file, so
+                    // the playlist has to remember where that is.
+                    song.localUri?.let { sObj.put("localUri", it) }
+                    song.localPath?.let { sObj.put("localPath", it) }
+                    song.localDateAddedSeconds?.let { sObj.put("localDateAdded", it) }
+                    song.trackNumber?.let { sObj.put("trackNumber", it) }
                     songsArray.put(sObj)
                 }
                 pObj.put("songs", songsArray)

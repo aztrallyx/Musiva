@@ -261,37 +261,22 @@ fun SongActionsSheet(
             GroupSeparator(palette)
         }
 
-        if (signedIn && !isOffline) {
+        // Playlists live on this device, so any song can go in one — no account.
+        ActionRow(
+            icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
+            label = stringResource(R.string.add_to_playlist),
+            accent = palette.accent,
+            onClick = onAddToPlaylist,
+        )
+        onRemoveFromPlaylist?.let {
             ActionRow(
-                icon = if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                label = if (liked) stringResource(R.string.remove_from_liked) else stringResource(R.string.like),
-                tint = if (liked) palette.accent else null,
+                icon = Icons.Rounded.PlaylistRemove,
+                label = stringResource(R.string.remove_from_playlist),
                 accent = palette.accent,
-                onClick = onToggleLike,
+                onClick = it,
             )
-            ActionRow(
-                icon = if (disliked) Icons.Rounded.ThumbDown else Icons.Rounded.ThumbDownOffAlt,
-                label = if (disliked) stringResource(R.string.undo_dislike) else stringResource(R.string.dislike),
-                tint = if (disliked) palette.accent else null,
-                accent = palette.accent,
-                onClick = onToggleDislike,
-            )
-            ActionRow(
-                icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                label = stringResource(R.string.add_to_playlist),
-                accent = palette.accent,
-                onClick = onAddToPlaylist,
-            )
-            onRemoveFromPlaylist?.let {
-                ActionRow(
-                    icon = Icons.Rounded.PlaylistRemove,
-                    label = stringResource(R.string.remove_from_playlist),
-                    accent = palette.accent,
-                    onClick = it,
-                )
-            }
-            GroupSeparator(palette)
         }
+        GroupSeparator(palette)
 
         onRemoveFromCache?.let {
             ActionRow(
@@ -302,12 +287,6 @@ fun SongActionsSheet(
             )
         }
         WebDavUploadRow(song, palette, isOffline, onUploadToWebDav)
-        ActionRow(
-            icon = Icons.Rounded.Radio,
-            label = stringResource(R.string.start_radio),
-            accent = palette.accent,
-            onClick = onStartRadio,
-        )
         ActionRow(
             icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
             label = stringResource(R.string.play_next),

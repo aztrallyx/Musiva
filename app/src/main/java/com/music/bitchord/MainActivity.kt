@@ -157,27 +157,15 @@ import com.music.bitchord.data.settings.ThemeMode
 import com.music.bitchord.ui.components.AccountProfileSelector
 import com.music.bitchord.ui.navigation.AppDestination
 import com.music.bitchord.ui.navigation.AppRoute
-import com.music.bitchord.ui.components.SpotifyImportAlert
 import com.music.bitchord.ui.screens.WearOsScreen
-import com.music.bitchord.ui.screens.AccountAndScrobblingScreen
-import com.music.bitchord.ui.screens.DiscordDialog
 import com.music.bitchord.ui.screens.DiscordDialogHost
-import com.music.bitchord.ui.screens.DiscordScreen
 import com.music.bitchord.ui.screens.EqualizerScreen
 import com.music.bitchord.ui.screens.HistoryScreen
 import com.music.bitchord.ui.screens.LibraryReplayEntry
-import com.music.bitchord.ui.screens.SPOTIFY_BROWSE_ID
 import com.music.bitchord.ui.screens.libraryLinks
 import com.music.bitchord.ui.screens.CACHE_FOLDER_BROWSE_ID
-import com.music.bitchord.ui.screens.ListenTogetherScreen
-import com.music.bitchord.ui.screens.PartyServerEditor
-import com.music.bitchord.ui.screens.SignatureApiEditor
 import com.music.bitchord.ui.screens.SettingsScreen
-import com.music.bitchord.ui.screens.SourceEditorAlert
-import com.music.bitchord.ui.screens.SourcesScreen
 import com.music.bitchord.data.sources.TrackMatcher
-import com.music.bitchord.ui.screens.SpotifyCanvasAuthScreen
-import com.music.bitchord.ui.screens.SpotifyLibraryScreen
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.playback.LinkRequest
@@ -565,34 +553,23 @@ private fun BitChordApp(
     var showReplayShare by rememberSaveable { mutableStateOf(false) }
     /** Which story card the share sheet is for, or null for the whole Replay. */
     var replaySharePage by rememberSaveable { mutableStateOf<ReplayStoryPage?>(null) }
-    var showSpotifyCanvasAuth by remember { mutableStateOf(false) }
 
     // Hosted here rather than inside SourcesScreen so its frosted card has
     // something to blur: that screen is drawn inside the `hazeSource` subtree,
     // and a haze effect sampling the layer it is itself part of renders with no
     // background at all. Hosting it here also puts the scrim over the tab bar
     // and the mini player, like every other alert in the app.
-    var editingSource by remember { mutableStateOf<SourceConfig?>(null) }
-    var editingPartyServer by remember { mutableStateOf(false) }
-    var editingSignatureApi by remember { mutableStateOf(false) }
     var detailActiveShelf by remember { mutableStateOf<HomeShelf?>(null) }
     var librarySortMenuOpen by remember { mutableStateOf(false) }
     var showLyricsSources by remember { mutableStateOf(false) }
     var showAppLanguage by remember { mutableStateOf(false) }
     var showTranslationLanguage by remember { mutableStateOf(false) }
     var showAccountSelector by remember { mutableStateOf(false) }
-    var showListenBrainzLogin by remember { mutableStateOf(false) }
-    var showLastfmLogin by remember { mutableStateOf(false) }
-    var showWebDavEditor by remember { mutableStateOf(false) }
-    var showSmbEditor by remember { mutableStateOf(false) }
     // Discord Rich Presence: its own page under Account & integrations (a
     // route), its own full-screen sign-in, and one slot for whichever of its
     // alerts is open. The alerts live out here rather than on the page because
     // their scrim has to cover the tab bar and mini player, which are drawn
     // after it.
-    var showDiscordLogin by remember { mutableStateOf(false) }
-    var showSpotifyLogin by remember { mutableStateOf(false) }
-    var discordDialog by remember { mutableStateOf<DiscordDialog?>(null) }
     var songActions by remember { mutableStateOf<Song?>(null) }
     var showLyricsOffset by remember { mutableStateOf(false) }
     /**
@@ -632,7 +609,6 @@ private fun BitChordApp(
     var creatingPlaylist by remember { mutableStateOf(false) }
     var accountPlaylistPicker by remember { mutableStateOf(false) }
     var editingLocalPlaylistId by remember { mutableStateOf<String?>(null) }
-    var showSpotifyImportDialog by remember { mutableStateOf(false) }
     // Which album or playlist the collection menu is open on, or null when it
     // is shut. One slot for every surface that can open it — the shelves on
     // three tabs, the search rows, the artist page's carousels, the release
@@ -752,25 +728,6 @@ private fun BitChordApp(
     var activeJamInviteCode by rememberSaveable { mutableStateOf<String?>(null) }
     var activeJamInviteServer by rememberSaveable { mutableStateOf<String?>(null) }
 
-    // An invite is navigation and an action: reveal the Jam settings page now,
-    // then let that page join once an account is available. Keeping the code
-    // here lets a sign-in round trip return to the invite it started from.
-    LaunchedEffect(incomingJamInvite) {
-        val invite = incomingJamInvite ?: return@LaunchedEffect
-        activeJamInviteCode = invite.code
-        activeJamInviteServer = invite.serverUrl
-        dismissPlayer()
-        replayStory = null
-        showReplayShare = false
-        webSession = null
-        navigator.reset(AppRoute.Settings, AppRoute.ListenTogether)
-        JamInviteLink.handled()
-    }
-    LaunchedEffect(signedIn, activeJamInviteCode) {
-        if (signedIn && activeJamInviteCode != null) {
-            navigator.pushAll(AppRoute.Settings, AppRoute.ListenTogether)
-        }
-    }
     val account by viewModel.account.collectAsStateWithLifecycle()
     val selectedChannelName by viewModel.selectedChannelName.collectAsStateWithLifecycle()
     val googleAccounts by viewModel.googleAccounts.collectAsStateWithLifecycle()
@@ -1130,9 +1087,8 @@ private fun BitChordApp(
     val queueLabel = stringResource(R.string.queue)
     val sharedLinkLabel = stringResource(R.string.shared_link)
     val tabs = remember(homeLabel, exploreLabel, libraryLabel, searchLabel) {
+        // A local-only build: the library of this device, and a search over it.
         listOf(
-            BottomTab(homeLabel, BitChordIcons.Home),
-            BottomTab(exploreLabel, BitChordIcons.TabExplore),
             BottomTab(libraryLabel, BitChordIcons.TabLibrary),
             BottomTab(searchLabel, BitChordIcons.TabSearch),
         )
@@ -1944,10 +1900,6 @@ private fun BitChordApp(
     // card opens the same way from either.
     val onLibraryItemClick: (ShelfItem) -> Unit = { item ->
         item.browseId?.let { id ->
-            if (id == SPOTIFY_BROWSE_ID) {
-                navigator.push(AppRoute.Spotify)
-                return@let
-            }
             if ((id == "local:all" || id == "local:downloads") && !LocalMediaRepository.hasStoragePermission(context)) {
                 mediaPermissionLauncher.launch(mediaPermission)
             }
@@ -2195,6 +2147,7 @@ private fun BitChordApp(
                 songMenuOrigin = null
                 songActions = song
             },
+            onAddToPlaylist = { playlistTarget = song },
             // Pushed over whatever page is under the player, so back from it
             // returns there.
             onOpenAlbum = { id ->
@@ -2267,7 +2220,7 @@ private fun BitChordApp(
                     }
                     PlaybackSourceType.HOME -> {
                         viewModel.closeMoodGenre()
-                        selectedTab = TAB_HOME
+                        selectedTab = TAB_LIBRARY
                     }
                     PlaybackSourceType.SEARCH -> {
                         viewModel.closeMoodGenre()
@@ -2281,7 +2234,7 @@ private fun BitChordApp(
                         replayLandingPage = ReplayStoryPage.INTRO
                         navigator.push(AppRoute.Replay)
                     }
-                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_EXPLORE
+                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_LIBRARY
                     PlaybackSourceType.SHARED_LINK -> {
                         val id = sourceId ?: return@openSource
                         context.startActivity(
@@ -2306,7 +2259,6 @@ private fun BitChordApp(
                 // The player is a sheet over the page, so it has to come down
                 // for the page to be read at all.
                 dismissPlayer()
-                navigator.pushAll(AppRoute.Settings, AppRoute.ListenTogether)
             },
             onClearQueue = {
                 // Keep what's playing and context/autoplay; drop user-queued tracks.
@@ -2323,9 +2275,9 @@ private fun BitChordApp(
     // minimizes the app. The gesture and the bar's back button both come here,
     // so they can never disagree about what is on top.
     val canGoBack = navigator.entries.isNotEmpty() || detailStack.isNotEmpty() ||
-        selectedMoodGenre != null || selectedTab != TAB_HOME
+        selectedMoodGenre != null || selectedTab != TAB_LIBRARY
     val goBack: () -> Unit = {
-        if (!navigator.pop() && !viewModel.closeMoodGenre()) selectedTab = TAB_HOME
+        if (!navigator.pop() && !viewModel.closeMoodGenre()) selectedTab = TAB_LIBRARY
     }
 
     Box(
@@ -2353,12 +2305,6 @@ private fun BitChordApp(
         BackHandler(enabled = replayDrawable && replayStory != null && !showReplayShare) { replayStory = null }
         BackHandler(enabled = replayDrawable && showReplayShare) { showReplayShare = false }
         BackHandler(enabled = showUpdateDialog) { showUpdateDialog = false }
-        BackHandler(enabled = showListenBrainzLogin) { showListenBrainzLogin = false }
-        BackHandler(enabled = showLastfmLogin) { showLastfmLogin = false }
-        BackHandler(enabled = discordDialog != null) { discordDialog = null }
-        BackHandler(enabled = editingSource != null) { editingSource = null }
-        BackHandler(enabled = editingPartyServer) { editingPartyServer = false }
-        BackHandler(enabled = editingSignatureApi) { editingSignatureApi = false }
 
         // On a tablet the page and the player stand side by side rather than
         // one over the other: everything a phone stacks in a single column —
@@ -2522,75 +2468,8 @@ private fun BitChordApp(
                                 listState = replayListState,
                                 landingPage = replayLandingPage,
                             )
-                        } else if (pageRoute == AppRoute.Spotify) {
-                            SpotifyLibraryScreen(
-                                onOpenPlaylist = { playlist ->
-                                    viewModel.openDetail(
-                                        browseId = SPOTIFY_PAGE_PREFIX + playlist.id,
-                                        title = playlist.name,
-                                        subtitle = playlist.owner ?: context.getString(R.string.spotify),
-                                        thumbnailUrl = playlist.imageUrl,
-                                        type = BrowseType.PLAYLIST,
-                                    )
-                                },
-                                onOpenLogin = { showSpotifyLogin = true },
-                                onOpenTokenSetup = { showSpotifyCanvasAuth = true },
-                                contentPadding = listPadding,
-                            )
-                        } else if (pageRoute == AppRoute.Discord) {
-                            DiscordScreen(
-                                song = player.song,
-                                positionMs = player.position.positionMs,
-                                durationMs = player.durationMs,
-                                onOpenLogin = { showDiscordLogin = true },
-                                onOpenDialog = { discordDialog = it },
-                                contentPadding = listPadding,
-                            )
-                        } else if (pageRoute == AppRoute.AccountScrobbling) {
-                            AccountAndScrobblingScreen(
-                                signedIn = signedIn,
-                                account = account,
-                                channelName = selectedChannelName,
-                                onSignIn = {
-                                    navigator.clear()
-                                    webSession = WebSessionMode.SIGN_IN
-                                },
-                                onSwitchChannel = {
-                                    viewModel.loadChannels()
-                                    showAccountSelector = true
-                                },
-                                onSignOut = { viewModel.signOut() },
-                                onOpenListenBrainzLogin = { showListenBrainzLogin = true },
-                                onOpenLastfmLogin = { showLastfmLogin = true },
-                                onOpenDiscord = { navigator.push(AppRoute.Discord) },
-                                onOpenSpotify = { navigator.push(AppRoute.Spotify) },
-                                contentPadding = listPadding,
-                            )
-                        } else if (pageRoute == AppRoute.Sources) {
-                            SourcesScreen(
-                                contentPadding = listPadding,
-                                onEditSource = { editingSource = it },
-                                onEditWebDav = { showWebDavEditor = true },
-                                onEditSmb = { showSmbEditor = true },
-                            )
                         } else if (pageRoute == AppRoute.WearOs) {
                             WearOsScreen(contentPadding = listPadding)
-                        } else if (pageRoute == AppRoute.ListenTogether) {
-                            ListenTogetherScreen(
-                                signedIn = signedIn,
-                                inviteCode = activeJamInviteCode,
-                                inviteServer = activeJamInviteServer,
-                                onInviteHandled = {
-                                    activeJamInviteCode = null
-                                    activeJamInviteServer = null
-                                },
-                                onSignIn = {
-                                    navigator.clear()
-                                    webSession = WebSessionMode.SIGN_IN
-                                },
-                                contentPadding = listPadding,
-                                onEditServer = { editingPartyServer = true },
-                            )
                         } else if (pageRoute == AppRoute.Equalizer) {
                             EqualizerScreen(contentPadding = listPadding)
                         } else if (pageRoute == AppRoute.Settings) {
@@ -2603,7 +2482,7 @@ private fun BitChordApp(
                                     webSession = WebSessionMode.SIGN_IN
                                 },
                                 onSignOut = { viewModel.signOut() },
-                                onAccountScrobbling = { navigator.push(AppRoute.AccountScrobbling) },
+                                onAccountScrobbling = {},
                                 onEqualizer = { navigator.push(AppRoute.Equalizer) },
                                 onOpenReplay = {
                                     replayLandingPage = ReplayStoryPage.INTRO
@@ -2611,12 +2490,10 @@ private fun BitChordApp(
                                 },
                                 onLyricsSources = { showLyricsSources = true },
                                 onTranslationLanguage = { showTranslationLanguage = true },
-                                onSources = { navigator.push(AppRoute.Sources) },
-                                onListenTogether = { navigator.push(AppRoute.ListenTogether) },
+                                onSources = {},
+                                onListenTogether = {},
                                 onWearOs = { navigator.push(AppRoute.WearOs) },
-                                onSpotifyCanvasAuth = { showSpotifyCanvasAuth = true },
                                 onAppLanguage = { showAppLanguage = true },
-                                onEditSignatureApi = { editingSignatureApi = true },
                                 contentPadding = listPadding,
                             )
                         } else if (page != null) {
@@ -3045,17 +2922,7 @@ private fun BitChordApp(
                                 showField = false,
                                 // The settings page's own two-state selector, so the
                                 // app has one look for "pick one of these".
-                                sourceSwitcher = {
-                                    SegmentedControl(
-                                        options = listOf(
-                                            stringResource(R.string.search_source_youtube),
-                                            stringResource(R.string.library),
-                                            stringResource(R.string.search_source_addons),
-                                        ),
-                                        selectedIndex = searchSource.ordinal,
-                                        onSelect = { index -> onSearchSourceChange(SearchSource.entries[index]) },
-                                    )
-                                },
+                                sourceSwitcher = null,
                                 searchingLibrary = searchSource == SearchSource.LIBRARY,
                                 libraryResults = libraryResults,
                                 searchingAddons = searchSource == SearchSource.ADDONS,
@@ -3100,7 +2967,8 @@ private fun BitChordApp(
                                 // does nothing; see [onBrowseLongPress].
                                 onShelfItemLongPress = onBrowseLongPress,
                                 onNewPlaylist = { creatingPlaylist = true },
-                                onImportSpotifyPlaylist = { showSpotifyImportDialog = true },
+                                onImportSpotifyPlaylist = null,
+                                localOnly = true,
                                 onShowAll = { shelf -> navigator.push(AppRoute.LibraryShowAll(shelf)) },
                                 replay = {
                                     LibraryReplayEntry(
@@ -3191,13 +3059,8 @@ private fun BitChordApp(
 
                 FrostedTopBar(
                     title = when (route) {
-                        AppRoute.Spotify -> stringResource(R.string.spotify)
-                        AppRoute.Discord -> "Discord"
                         AppRoute.History -> stringResource(R.string.history)
                         is AppRoute.LibraryShowAll -> route.shelf.title
-                        AppRoute.AccountScrobbling -> stringResource(R.string.account_scrobbling)
-                        AppRoute.Sources -> stringResource(R.string.sources)
-                        AppRoute.ListenTogether -> stringResource(R.string.listen_together)
                         AppRoute.WearOs -> stringResource(R.string.wear_os_page_title)
                         AppRoute.Equalizer -> stringResource(R.string.equalizer)
                         AppRoute.Settings -> stringResource(R.string.settings)
@@ -3273,65 +3136,6 @@ private fun BitChordApp(
                         }
                     } else null,
                     actions = {
-                        // This is intentionally scoped to Listen together: the
-                        // round-trip time is meaningful while coordinating a
-                        // party, but would be noise in the rest of the app.
-                        if (route == AppRoute.ListenTogether) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp),
-                            ) {
-                                when (val state = partyServerStatus) {
-                                    is ServerConnectionState.CustomFallback -> {
-                                        Icon(
-                                            Icons.Rounded.CloudOff,
-                                            contentDescription = stringResource(R.string.listen_together_top_bar_fallback, stringResource(R.string.listen_together_ping, state.latencyMs)),
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(14.dp),
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = stringResource(R.string.listen_together_ping, state.latencyMs),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.error,
-                                            maxLines = 1,
-                                        )
-                                    }
-                                    is ServerConnectionState.CustomOnline -> {
-                                        Text(
-                                            text = stringResource(R.string.listen_together_ping, state.latencyMs),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                        )
-                                    }
-                                    is ServerConnectionState.DefaultOnline -> {
-                                        Text(
-                                            text = stringResource(R.string.listen_together_ping, state.latencyMs),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                        )
-                                    }
-                                    ServerConnectionState.Checking -> {
-                                        Text(
-                                            text = stringResource(R.string.listen_together_server_checking),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                        )
-                                    }
-                                    ServerConnectionState.Offline -> {
-                                        Text(
-                                            text = stringResource(R.string.listen_together_server_offline_dash),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.error,
-                                            maxLines = 1,
-                                        )
-                                    }
-                                }
-                            }
-                        }
                         // Only worth surfacing where there's room for it and it won't
                         // be mistaken for a per-page action — Home, at rest.
                         if (route == null && detail == null && selectedTab == TAB_HOME) {
@@ -4015,12 +3819,15 @@ private fun BitChordApp(
                     viewModel.loadPlaylists()
                     playlistTarget = song
                 },
-                onRemoveFromPlaylist = editable?.let {
-                    {
-                        songActions = null
-                        viewModel.removeFromPlaylist(it.browseId, song)
-                    }
-                },
+                onRemoveFromPlaylist = detail?.browseId
+                    ?.takeIf { !fromPlayer }
+                    ?.let { com.music.bitchord.data.spotify.LocalPlaylistStore.getPlaylist(it) }
+                    ?.let { local ->
+                        {
+                            songActions = null
+                            com.music.bitchord.data.spotify.LocalPlaylistStore.removeSong(local.id, song.videoId)
+                        }
+                    },
                 onRemoveFromCache = if (inCache) {
                     {
                         songActions = null
@@ -4284,34 +4091,6 @@ private fun BitChordApp(
                     )
                 }
             }
-        }
-
-        if (showSpotifyImportDialog) {
-            BackHandler { showSpotifyImportDialog = false }
-            SpotifyImportAlert(
-                hazeState = hazeState,
-                signedIn = signedIn,
-                onImported = { title, privacy, songs ->
-                    viewModel.createPlaylistWithVideoIds(
-                        title,
-                        privacy,
-                        songs.map { it.videoId },
-                        songs,
-                    ) { browseId, pTitle, savedLocally ->
-                        showQueueNotice(
-                            context.getString(
-                                if (savedLocally && signedIn) R.string.spotify_import_local_fallback
-                                else R.string.spotify_import_done,
-                                pTitle,
-                            ),
-                        )
-                        browseId?.let { id ->
-                            viewModel.openDetail(id, pTitle, "${songs.size} songs", songs.firstOrNull()?.thumbnailUrl)
-                        }
-                    }
-                },
-                onDismiss = { showSpotifyImportDialog = false },
-            )
         }
 
         // ---- Album / playlist actions ----
@@ -4720,30 +4499,6 @@ private fun BitChordApp(
             )
         }
 
-        if (showAccountSelector) {
-            BackHandler { showAccountSelector = false }
-            AccountProfileSelector(
-                accounts = googleAccounts,
-                activeAccountId = activeAccountId,
-                activeProfileId = activeProfileId,
-                hazeState = hazeState,
-                onSelect = { selected, profile -> viewModel.selectProfile(selected.accountId, profile.profileId) },
-                onAddAccount = {
-                    showAccountSelector = false
-                    webSession = WebSessionMode.SIGN_IN
-                },
-                onRemoveAccount = { selected ->
-                    viewModel.removeAccount(selected.accountId)
-                    showAccountSelector = false
-                },
-                onOpenSettings = {
-                    showAccountSelector = false
-                    navigator.push(AppRoute.Settings)
-                },
-                onDismiss = { showAccountSelector = false },
-            )
-        }
-
         if (showAppLanguage) {
             BackHandler { showAppLanguage = false }
             AppLanguageDialog(
@@ -4757,159 +4512,6 @@ private fun BitChordApp(
             TranslationLanguageDialog(
                 hazeState = hazeState,
                 onDismiss = { showTranslationLanguage = false },
-            )
-        }
-
-        if (showListenBrainzLogin) {
-            var tokenInput by remember { mutableStateOf(listenBrainzToken) }
-            ListenBrainzTokenAlert(
-                hazeState = hazeState,
-                tokenInput = tokenInput,
-                onTokenInputChange = { tokenInput = it },
-                onSave = {
-                    AppSettings.setListenBrainzToken(tokenInput.trim())
-                    showListenBrainzLogin = false
-                },
-                onDismiss = { showListenBrainzLogin = false },
-            )
-        }
-
-        if (showLastfmLogin) {
-            var usernameInput by remember { mutableStateOf("") }
-            var passwordInput by remember { mutableStateOf("") }
-            var lastfmError by remember { mutableStateOf<String?>(null) }
-            var lastfmLoading by remember { mutableStateOf(false) }
-            LastfmLoginAlert(
-                hazeState = hazeState,
-                usernameInput = usernameInput,
-                onUsernameInputChange = { usernameInput = it },
-                passwordInput = passwordInput,
-                onPasswordInputChange = { passwordInput = it },
-                error = lastfmError,
-                loading = lastfmLoading,
-                onSignIn = {
-                    lastfmLoading = true
-                    lastfmError = null
-                    scope.launch {
-                        try {
-                            LastFM.initialize(
-                                apiKey = AppSettings.lastfmApiKey.value,
-                                secret = AppSettings.lastfmSecret.value,
-                            )
-                            LastFM.getMobileSession(usernameInput.trim(), passwordInput)
-                                .onSuccess { auth ->
-                                    AppSettings.setLastfmSessionKey(auth.session.key)
-                                    AppSettings.setLastfmUsername(auth.session.name)
-                                    AppSettings.setLastfmEnabled(true)
-                                    showLastfmLogin = false
-                                }
-                                .onFailure { e ->
-                                    lastfmError = e.message ?: context.getString(R.string.login_failed)
-                                }
-                        } catch (e: Exception) {
-                            lastfmError = e.message ?: context.getString(R.string.login_failed)
-                        } finally {
-                            lastfmLoading = false
-                        }
-                    }
-                },
-                onDismiss = { if (!lastfmLoading) showLastfmLogin = false },
-            )
-        }
-
-        if (showWebDavEditor) {
-            BackHandler { showWebDavEditor = false }
-            ServerEditorHost(
-                hazeState = hazeState,
-                title = stringResource(R.string.webdav),
-                description = stringResource(R.string.webdav_description),
-                fields = listOf(
-                    FieldConfig(
-                        initial = AppSettings.webdavUrl.value,
-                        placeholder = stringResource(R.string.webdav_server_url_hint),
-                        keyboardType = KeyboardType.Uri,
-                    ),
-                    FieldConfig(
-                        initial = AppSettings.webdavUsername.value,
-                        placeholder = stringResource(R.string.username),
-                    ),
-                    FieldConfig(
-                        initial = AppSettings.webdavPassword.value,
-                        placeholder = stringResource(R.string.password),
-                        keyboardType = KeyboardType.Password,
-                        isPassword = true,
-                    ),
-                ),
-                canSubmit = { it[0].isNotBlank() },
-                testFailedRes = R.string.webdav_test_failed,
-                onTest = { (url, username, password) ->
-                    com.music.bitchord.data.webdav.WebDavRepository.testConnection(
-                        url.trim(),
-                        username.trim(),
-                        password,
-                    )
-                },
-                onSave = { (url, username, password) ->
-                    AppSettings.setWebDavUrl(url.trim())
-                    AppSettings.setWebDavUsername(username.trim())
-                    AppSettings.setWebDavPassword(password)
-                    showWebDavEditor = false
-                },
-                onDismiss = { showWebDavEditor = false },
-            )
-        }
-
-        if (showSmbEditor) {
-            BackHandler { showSmbEditor = false }
-            ServerEditorHost(
-                hazeState = hazeState,
-                title = stringResource(R.string.smb),
-                description = stringResource(R.string.smb_description),
-                fields = listOf(
-                    FieldConfig(
-                        initial = AppSettings.smbHost.value,
-                        placeholder = stringResource(R.string.smb_server_hint),
-                        keyboardType = KeyboardType.Uri,
-                    ),
-                    FieldConfig(
-                        initial = AppSettings.smbShare.value,
-                        placeholder = stringResource(R.string.smb_share_hint),
-                    ),
-                    FieldConfig(
-                        initial = AppSettings.smbBasePath.value,
-                        placeholder = stringResource(R.string.smb_folder_hint),
-                    ),
-                    FieldConfig(
-                        initial = AppSettings.smbUsername.value,
-                        placeholder = stringResource(R.string.username),
-                    ),
-                    FieldConfig(
-                        initial = AppSettings.smbPassword.value,
-                        placeholder = stringResource(R.string.password),
-                        keyboardType = KeyboardType.Password,
-                        isPassword = true,
-                    ),
-                ),
-                canSubmit = { it[0].isNotBlank() && it[1].isNotBlank() },
-                testFailedRes = R.string.smb_test_failed,
-                onTest = { (host, share, folder, username, password) ->
-                    com.music.bitchord.data.smb.SmbRepository.testConnection(
-                        host.trim(),
-                        share.trim(),
-                        folder.trim(),
-                        username.trim(),
-                        password,
-                    )
-                },
-                onSave = { (host, share, folder, username, password) ->
-                    AppSettings.setSmbHost(host.trim())
-                    AppSettings.setSmbShare(share.trim())
-                    AppSettings.setSmbBasePath(folder.trim())
-                    AppSettings.setSmbUsername(username.trim())
-                    AppSettings.setSmbPassword(password)
-                    showSmbEditor = false
-                },
-                onDismiss = { showSmbEditor = false },
             )
         }
 
@@ -4936,125 +4538,6 @@ private fun BitChordApp(
                 onKeepBoth = { answer(com.music.bitchord.data.webdav.WebDavUploads.Choice.KEEP_BOTH) },
                 onSkip = { answer(com.music.bitchord.data.webdav.WebDavUploads.Choice.SKIP) },
                 onDismiss = { answer(com.music.bitchord.data.webdav.WebDavUploads.Choice.SKIP) },
-            )
-        }
-
-        // ---- Discord sign-in (full screen WebView) ----
-        if (showDiscordLogin) {
-            BackHandler { showDiscordLogin = false }
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Column(Modifier.fillMaxSize()) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = { showDiscordLogin = false }) {
-                            Icon(
-                                Icons.Rounded.Close,
-                                contentDescription = stringResource(R.string.close),
-                                tint = MaterialTheme.colorScheme.onBackground,
-                            )
-                        }
-                        Text(
-                            "Sign in to Discord",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                    }
-                    DiscordLoginScreen(
-                        onTokenCaptured = { token ->
-                            AppSettings.setDiscordToken(token)
-                            showDiscordLogin = false
-                        },
-                    )
-                }
-            }
-        }
-
-        // ---- Spotify sign-in (full screen WebView) ----
-        // Out here with Discord's rather than on the Spotify page itself: see
-        // SpotifyLoginScreen for what the blurred content tree does to a WebView.
-        if (showSpotifyLogin) {
-            BackHandler { showSpotifyLogin = false }
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Column(Modifier.fillMaxSize()) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = { showSpotifyLogin = false }) {
-                            Icon(
-                                Icons.Rounded.Close,
-                                contentDescription = stringResource(R.string.close),
-                                tint = MaterialTheme.colorScheme.onBackground,
-                            )
-                        }
-                        Text(
-                            stringResource(R.string.spotify_sign_in),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                    }
-                    SpotifyLoginScreen(
-                        modifier = Modifier.navigationBarsPadding(),
-                        onConnected = { token ->
-                            AppSettings.setSpotifySpdcToken(token)
-                            showSpotifyLogin = false
-                        },
-                    )
-                }
-            }
-        }
-
-        if (showSpotifyCanvasAuth) {
-            BackHandler { showSpotifyCanvasAuth = false }
-            SpotifyCanvasAuthScreen(
-                onNavigateUp = { showSpotifyCanvasAuth = false }
-            )
-        }
-
-        discordDialog?.let { which ->
-            DiscordDialogHost(
-                which = which,
-                hazeState = hazeState,
-                onDismiss = { discordDialog = null },
-            )
-        }
-
-        // At the root with the source editor, and for the same two reasons: it
-        // is a haze card that has to sample the backdrop it is *not* inside,
-        // and a full-window scrim that has to be full-window.
-        if (editingPartyServer) {
-            PartyServerEditor(
-                hazeState = hazeState,
-                onDismiss = { editingPartyServer = false },
-            )
-        }
-
-        if (editingSignatureApi) {
-            SignatureApiEditor(
-                hazeState = hazeState,
-                onDismiss = { editingSignatureApi = false },
-            )
-        }
-
-        editingSource?.let { config ->
-            SourceEditorAlert(
-                hazeState = hazeState,
-                config = config,
-                onDismiss = { editingSource = null },
-                onSaved = { editingSource = null },
-                onDelete = {
-                    SourceRegistry.remove(config.id)
-                    editingSource = null
-                },
-                scope = scope,
             )
         }
 
@@ -5348,7 +4831,10 @@ private object PlayerSheetShape : Shape {
         Outline.Rectangle(Rect(0f, -size.height, size.width, size.height))
 }
 
-private const val TAB_HOME = 0
-private const val TAB_EXPLORE = 1
-private const val TAB_LIBRARY = 2
-private const val TAB_SEARCH = 3
+// Only Library and Search are on the tab bar, in that order. Home and Explore
+// keep ids the bar can never select, so the code that still mentions them
+// compiles but is never reached.
+private const val TAB_LIBRARY = 0
+private const val TAB_SEARCH = 1
+private const val TAB_HOME = 98
+private const val TAB_EXPLORE = 99

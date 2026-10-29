@@ -708,6 +708,8 @@ fun NowPlayingScreen(
     onQueueDragActiveChange: (Boolean) -> Unit = {},
     onClearQueue: () -> Unit,
     onOpenMenu: () -> Unit,
+    /** Opens the "add to playlist" picker for the song on screen. */
+    onAddToPlaylist: () -> Unit = {},
     onOpenAlbum: (String) -> Unit,
     /**
      * Opens an artist's page. [browseId] is null for anyone but the lead credit:
@@ -3272,6 +3274,13 @@ fun NowPlayingScreen(
                             // there's no account to record it against — and neither
                             // does a local file or a finished download, which carries
                             // no YouTube identity to rate.
+                            CircleGlyph(
+                                icon = BitChordIcons.Plus,
+                                contentDescription = stringResource(Res.string.add_to_playlist),
+                                onClick = onAddToPlaylist,
+                                haptic = Haptic.Tap,
+                            )
+                            Spacer(Modifier.width(8.dp))
                             if (signedIn && song.localUri == null) {
                                 val liked = likeStatus == LikeStatus.LIKE
                                 CircleGlyph(

@@ -39,7 +39,6 @@ fun libraryLinks(): List<LibraryLink> {
     val smbHost by AppSettings.smbHost.collectAsStateWithLifecycle()
     val smbShare by AppSettings.smbShare.collectAsStateWithLifecycle()
     val showCacheFolder by AppSettings.showCacheFolder.collectAsStateWithLifecycle()
-    val spotifyConnected by AppSettings.spotifySpdcToken.collectAsStateWithLifecycle()
     fun link(title: String, subtitle: String, browseId: String, icon: ImageVector = deviceFolderIcon(browseId) ?: Icons.Rounded.Cloud) = LibraryLink(
         item = ShelfItem(
             title = title,
@@ -74,13 +73,6 @@ fun libraryLinks(): List<LibraryLink> {
             stringResource(R.string.smb_subtitle),
             com.music.bitchord.data.smb.SmbConfig.BROWSE_ID,
         ).takeIf { smbHost.isNotBlank() && smbShare.isNotBlank() },
-        // Only while signed in to Spotify in Settings → Accounts; it opens that
-        // account's playlists rather than a browse page.
-        link(
-            stringResource(R.string.spotify),
-            stringResource(R.string.spotify_library_subtitle),
-            SPOTIFY_BROWSE_ID,
-        ).takeIf { spotifyConnected.isNotBlank() }?.copy(logo = Res.drawable.spotify_logo),
     )
 }
 

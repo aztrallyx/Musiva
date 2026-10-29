@@ -15,15 +15,10 @@ import com.music.bitchord.data.model.HomeShelf
  */
 sealed interface AppRoute {
     data object Settings : AppRoute
-    data object AccountScrobbling : AppRoute
-    data object Sources : AppRoute
-    data object ListenTogether : AppRoute
     data object WearOs : AppRoute
     data object Equalizer : AppRoute
     data object Replay : AppRoute
     data object History : AppRoute
-    data object Discord : AppRoute
-    data object Spotify : AppRoute
 
     /** A Library shelf's "Show all" — its own cards laid out again as a grid. */
     data class LibraryShowAll(val shelf: HomeShelf) : AppRoute

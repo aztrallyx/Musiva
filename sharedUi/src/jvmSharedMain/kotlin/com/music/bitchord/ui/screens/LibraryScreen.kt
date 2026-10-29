@@ -116,6 +116,12 @@ fun LibraryScreen(
     deviceItems: List<ShelfItem>,
     /** The big "Library" heading; the desktop's pages carry none. */
     showTitle: Boolean = true,
+    /**
+     * A build with no online account: the page is just the device's folders and
+     * the playlists kept on it — no Replay, no sign-in prompt, no account shelves.
+     * [deviceItems] are then the playlists themselves.
+     */
+    localOnly: Boolean = false,
 ) {
     val pinnedPlaylists by AppUi.host.pinnedPlaylists.collectAsStateWithLifecycle()
     val onDevice = stringResource(Res.string.on_device)
@@ -140,9 +146,23 @@ fun LibraryScreen(
                     )
                 }
             }
-            item(key = "replay") { replay() }
+            if (!localOnly) item(key = "replay") { replay() }
             if (links.isNotEmpty()) {
                 item(key = "links") { LibraryLinkList(links = links, onClick = onShelfItemClick) }
+            }
+            if (localOnly) {
+                item(key = "shelf:$PLAYLISTS") {
+                    val playlists = HomeShelf(PLAYLISTS, deviceItems)
+                    PlaylistShelf(
+                        shelf = playlists,
+                        onItemClick = onShelfItemClick,
+                        onItemLongPress = onShelfItemLongPress,
+                        onNewPlaylist = onNewPlaylist,
+                        onImportSpotifyPlaylist = null,
+                        onShowAll = { onShowAll(playlists) },
+                    )
+                }
+                return@LazyColumn
             }
             if (deviceItems.isNotEmpty()) {
                 item(key = "shelf:$onDevice") {

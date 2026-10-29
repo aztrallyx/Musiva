@@ -174,7 +174,8 @@ fun OnboardingScreen(
                             if (chosen.isEmpty()) return@next
                             focusManager.clearFocus()
                             onNameChosen(chosen)
-                            if (signedIn) onFinish() else page = PAGE_CONNECT
+                            // Musiva has no account to connect: the welcome ends after the name.
+                            onFinish()
                         },
                     )
                     else -> ConnectPage(

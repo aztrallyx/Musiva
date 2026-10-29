@@ -187,9 +187,7 @@ fun SettingsScreen(
     onSources: () -> Unit,
     onListenTogether: () -> Unit,
     onWearOs: () -> Unit,
-    onSpotifyCanvasAuth: () -> Unit,
     onAppLanguage: () -> Unit,
-    onEditSignatureApi: () -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -216,8 +214,6 @@ fun SettingsScreen(
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
     val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
     val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
-    val signatureApiEnabled by AppSettings.signatureApiEnabled.collectAsStateWithLifecycle()
-    val signatureApiUrl by AppSettings.signatureApiUrl.collectAsStateWithLifecycle()
     val fullBleedArtwork by AppSettings.fullBleedArtwork.collectAsStateWithLifecycle()
     val legacyMeshGradient by AppSettings.legacyMeshGradient.collectAsStateWithLifecycle()
     val syncedLyrics by AppSettings.syncedLyrics.collectAsStateWithLifecycle()
@@ -402,113 +398,6 @@ fun SettingsScreen(
             placeholder = stringResource(R.string.settings_search_hint),
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
         )
-
-        SearchableSettingsGroup(search) {
-            val accountTitle = stringResource(R.string.account_integrations)
-            // What the row opens is the scrobbling screen, so the services it
-            // signs into are worth typing at this field even though none of
-            // them is named on the row itself.
-            row(accountTitle, "scrobbling", "last.fm", "listenbrainz") {
-                SettingsRow(
-                    icon = Icons.Rounded.Person,
-                    title = accountTitle,
-                    subtitle = account?.email?.takeIf { it.isNotBlank() }
-                        ?: stringResource(if (signedIn) R.string.signed_in else R.string.not_signed_in),
-                    onClick = onAccountScrobbling,
-                )
-            }
-            // Sits with the account rather than with Playback: a party is up to
-            // five signed-in people, and being signed in is the whole of what
-            // the row needs before it will do anything.
-            val listenTogetherTitle = stringResource(R.string.listen_together)
-            row(listenTogetherTitle, "jam", "party", "sync", "friends") {
-                SettingsRow(
-                    icon = Icons.Rounded.Groups,
-                    title = listenTogetherTitle,
-                    subtitle = party.code?.let {
-                        stringResource(R.string.listen_together_in_party, it)
-                    } ?: stringResource(R.string.listen_together_subtitle),
-                    badge = party.members.size.takeIf { party.inParty && it > 1 }?.toString(),
-                    onClick = onListenTogether,
-                )
-            }
-        }
-
-        // The row that used to sit at the top of this group was called
-        // "Lossless / HQ Audio" and toggled `SourceRegistry.setModuleEnabled` —
-        // it switched the *module source* on and off, not lossless. Sources
-        // above lists that as the module's own row now. Lossless itself is no
-        // longer a setting at all — see
-        // [SourceResolver.requestForNow][com.music.bitchord.data.sources.SourceResolver.requestForNow].
-        SearchableSettingsGroup(search, header = stringResource(R.string.audio_quality)) {
-            val sourceTitle = stringResource(R.string.source)
-            val sourceSubtitle = stringResource(R.string.sources_subtitle)
-            row(sourceTitle, sourceSubtitle, "addon", "lossless") {
-                SettingsRow(
-                    icon = Icons.Rounded.Extension,
-                    title = sourceTitle,
-                    subtitle = sourceSubtitle,
-                    onClick = onSources,
-                )
-            }
-            val onWifiTitle = stringResource(R.string.on_wifi)
-            row(onWifiTitle, "wi-fi", "streaming quality") {
-                SettingsRow(
-                    icon = Icons.Rounded.Wifi,
-                    title = onWifiTitle,
-                    badge = stringResource(R.string.in_use).takeIf { metered == false },
-                    value = wifiQuality.localizedLabel(),
-                    onClick = { picking = QualityTarget.WIFI },
-                )
-            }
-            val onMobileDataTitle = stringResource(R.string.on_mobile_data)
-            row(onMobileDataTitle, "cellular", "streaming quality") {
-                SettingsRow(
-                    icon = Icons.Rounded.SignalCellularAlt,
-                    title = onMobileDataTitle,
-                    badge = stringResource(R.string.in_use).takeIf { metered == true },
-                    value = cellularQuality.localizedLabel(),
-                    onClick = { picking = QualityTarget.CELLULAR },
-                )
-            }
-            // Sits with the quality ceilings rather than with Playback: it
-            // decides which version of a track gets fetched, the same question
-            // the two rows above answer, and not how one is played back.
-            //
-            // Greyed rather than hidden where the device can't decode E-AC-3.
-            // A missing row reads as a feature the app doesn't have; a disabled
-            // one with a reason under it is the difference between "BitChord
-            // has no Atmos" and "this phone has no Dolby decoder", and only the
-            // second is true. The stored preference is left untouched either
-            // way — see [AppSettings.dolbyAtmos].
-            val dolbyAtmosTitle = stringResource(R.string.dolby_atmos)
-            row(dolbyAtmosTitle, "surround", "e-ac-3") {
-                SettingsRow(
-                    iconPainter = painterResource(R.drawable.ic_dolby_atmos),
-                    title = dolbyAtmosTitle,
-                    subtitle = stringResource(
-                        if (dolbyAtmosSupported) {
-                            R.string.dolby_atmos_subtitle
-                        } else {
-                            R.string.dolby_atmos_unavailable
-                        },
-                    ),
-                    enabled = dolbyAtmosSupported,
-                    trailing = {
-                        Switch(
-                            checked = dolbyAtmos && dolbyAtmosSupported,
-                            onCheckedChange = AppSettings::setDolbyAtmos,
-                            enabled = dolbyAtmosSupported,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setDolbyAtmos(!dolbyAtmos) },
-                )
-            }
-        }
 
         SearchableSettingsGroup(search, header = stringResource(R.string.playback)) {
             val preferMusicOnlyTitle = stringResource(R.string.prefer_music_only)
@@ -835,106 +724,6 @@ fun SettingsScreen(
                     onClick = { AppSettings.setLegacyMeshGradient(!legacyMeshGradient) },
                 )
             }
-            val animatedCoverArtTitle = stringResource(R.string.animated_cover_art)
-            // Carries the keywords of the rows that only appear once it is on,
-            // so searching "spotify" with animated covers switched off turns up
-            // the switch that brings the Spotify row back rather than nothing.
-            row(animatedCoverArtTitle, "canvas", "video", "spotify") {
-                SettingsRow(
-                    icon = Icons.Rounded.Animation,
-                    title = animatedCoverArtTitle,
-                    subtitle = stringResource(R.string.animated_cover_art_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = animatedCanvas,
-                            onCheckedChange = AppSettings::setAnimatedCanvas,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setAnimatedCanvas(!animatedCanvas) },
-                )
-            }
-            // Reads as part of the Animated cover art option above it, not
-            // as a separate setting. Nothing to narrow while the clip itself
-            // is off. Defaults to off: a clip loops for as long as its track
-            // plays, so on cellular this is not a one-time video cost but
-            // that cost repeated on every loop — see AppSettings.canvasOverCellular.
-            if (animatedCanvas) {
-                val coverCellularTitle = stringResource(R.string.animated_cover_cellular)
-                row(coverCellularTitle, "canvas", "cellular", divided = false) {
-                    SettingsSubRow(
-                        title = coverCellularTitle,
-                        checked = canvasOverCellular,
-                        onCheckedChange = AppSettings::setCanvasOverCellular,
-                    )
-                }
-                val spotifyCanvasTitle = stringResource(R.string.integrate_spotify_canvas)
-                row(spotifyCanvasTitle, "spotify", "canvas", divided = false) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onSpotifyCanvasAuth)
-                            .padding(start = ROW_INSET, end = ROW_INSET, top = 4.dp, bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = spotifyCanvasTitle,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Chevron()
-                    }
-                }
-            }
-            val artistSignaturesTitle = stringResource(R.string.artist_signatures)
-            row(artistSignaturesTitle, "signature", "artist", "logo") {
-                SettingsRow(
-                    icon = Icons.Rounded.Draw,
-                    title = artistSignaturesTitle,
-                    subtitle = stringResource(R.string.artist_signatures_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = signatureApiEnabled,
-                            onCheckedChange = AppSettings::setSignatureApiEnabled,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setSignatureApiEnabled(!signatureApiEnabled) },
-                )
-            }
-            if (signatureApiEnabled) {
-                val signatureUrlTitle = stringResource(R.string.artist_signatures_url)
-                row(signatureUrlTitle, "signature", "api", "url", divided = false) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onEditSignatureApi)
-                            .padding(start = ROW_INSET, end = ROW_INSET, top = 4.dp, bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = signatureApiUrl.ifBlank {
-                                stringResource(R.string.artist_signatures_unconfigured)
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Chevron()
-                    }
-                }
-            }
             val syncedLyricsTitle = stringResource(R.string.synced_lyrics)
             // Same reasoning as Animated cover art above: the lyrics source and
             // translation rows are only here while this is on.
@@ -1196,38 +985,6 @@ fun SettingsScreen(
         }
 
         SearchableSettingsGroup(search, header = stringResource(R.string.your_data)) {
-            val replayTitle = stringResource(R.string.replay)
-            row(replayTitle, "stats", "history", "wrapped") {
-                SettingsRow(
-                    icon = Icons.Rounded.BarChart,
-                    title = replayTitle,
-                    subtitle = stringResource(R.string.replay_subtitle),
-                    onClick = onOpenReplay,
-                )
-            }
-            val workOutGenresTitle = stringResource(R.string.work_out_genres)
-            row(workOutGenresTitle, "genre", "replay") {
-                SettingsRow(
-                    icon = Icons.Rounded.LocalOffer,
-                    title = workOutGenresTitle,
-                    subtitle = if (replayGenres) {
-                        stringResource(R.string.replay_genres_enabled_subtitle)
-                    } else {
-                        stringResource(R.string.replay_genres_disabled_subtitle)
-                    },
-                    trailing = {
-                        Switch(
-                            checked = replayGenres,
-                            onCheckedChange = AppSettings::setReplayGenres,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setReplayGenres(!replayGenres) },
-                )
-            }
             val exportDataTitle = stringResource(R.string.export_data)
             row(exportDataTitle, "backup") {
                 SettingsRow(
